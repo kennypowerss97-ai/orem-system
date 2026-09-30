@@ -47,8 +47,18 @@ if STATIC_DIR.exists():
 
 @app.on_event("startup")
 async def startup():
+    from sqlalchemy import text
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Check and migrate columns if needed
+        try:
+            cols_res = await conn.execute(text("PRAGMA table_info(students)"))
+            cols = [row[1] for row in cols_res.fetchall()]
+            if "preferred_therapist_id" not in cols:
+                await conn.execute(text("ALTER TABLE students ADD COLUMN preferred_therapist_id VARCHAR"))
+                logger.info("Migrated students table: added preferred_therapist_id column.")
+        except Exception as e:
+            logger.warning(f"Schema migration notice: {e}")
     
     # Run seed data
     async with async_session_maker() as db:

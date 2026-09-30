@@ -1,22 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Input, Space, Tag, Modal, Steps, Form, Select, DatePicker, message, Popconfirm, Row, Col, InputNumber, Tooltip } from 'antd';
-import { PlusOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined, EditOutlined } from '@ant-design/icons';
+import { Table, Button, Input, Space, Tag, Modal, Steps, Form, Select, DatePicker, message, Popconfirm, Row, Col, Tooltip } from 'antd';
+import { PlusOutlined, SearchOutlined, EyeOutlined, DeleteOutlined, ReloadOutlined, EditOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getStudents, createStudent, updateStudent, deleteStudent } from '../api/students';
 import { getModules } from '../api/modules';
+import { getTherapists } from '../api/therapists';
+import { getDisabilities, DisabilityItem } from '../api/disabilities';
 import dayjs from 'dayjs';
 
 const { Step } = Steps;
-
-const DISABILITY_OPTIONS = [
-  { value: 'Otizm Spektrum Bozukluğu', label: 'Otizm Spektrum Bozukluğu' },
-  { value: 'Serebral Palsi (Bedensel)', label: 'Serebral Palsi (Bedensel)' },
-  { value: 'Özel Öğrenme Güçlüğü (Disleksi)', label: 'Özel Öğrenme Güçlüğü (Disleksi)' },
-  { value: 'Dil ve Konuşma Bozukluğu', label: 'Dil ve Konuşma Bozukluğu' },
-  { value: 'Zihinsel Yetersizlik', label: 'Zihinsel Yetersizlik' },
-  { value: 'İşitme Yetersizliği', label: 'İşitme Yetersizliği' },
-  { value: 'Down Sendromu', label: 'Down Sendromu' }
-];
 
 const StudentsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -30,6 +22,8 @@ const StudentsPage: React.FC = () => {
   const [editingStudent, setEditingStudent] = useState<any | null>(null);
   const [currentStep, setCurrentStep] = useState(0);
   const [modules, setModules] = useState<any[]>([]);
+  const [therapists, setTherapists] = useState<any[]>([]);
+  const [disabilities, setDisabilities] = useState<DisabilityItem[]>([]);
   const [form] = Form.useForm();
 
   const fetchStudents = async () => {
@@ -44,18 +38,24 @@ const StudentsPage: React.FC = () => {
     }
   };
 
-  const fetchAvailableModules = async () => {
+  const fetchDependencies = async () => {
     try {
-      const res = await getModules();
-      setModules(res || []);
+      const [mRes, tRes, dRes] = await Promise.all([
+        getModules().catch(() => []),
+        getTherapists().catch(() => ({ data: [] })),
+        getDisabilities().catch(() => [])
+      ]);
+      setModules(Array.isArray(mRes) ? mRes : (mRes as any)?.data || []);
+      setTherapists(Array.isArray(tRes) ? tRes : (tRes as any)?.data || []);
+      setDisabilities(Array.isArray(dRes) ? dRes : (dRes as any)?.data || []);
     } catch (e) {
-      console.error(e);
+      console.error('Bağımlılıklar yüklenirken hata:', e);
     }
   };
 
   useEffect(() => {
     fetchStudents();
-    fetchAvailableModules();
+    fetchDependencies();
   }, [selectedDisability]);
 
   const handleDelete = async (id: string) => {
@@ -86,6 +86,7 @@ const StudentsPage: React.FC = () => {
       birthDate: student.birthDate ? dayjs(student.birthDate) : undefined,
       gender: student.gender || 'Erkek',
       disabilityType: student.disabilityType,
+      preferredTherapistId: student.preferredTherapistId,
       notes: student.notes || '',
       guardianName: student.guardian?.name || '',
       guardianPhone: student.guardian?.phone || '',
@@ -100,31 +101,35 @@ const StudentsPage: React.FC = () => {
 
   const handleFinish = async () => {
     try {
-      const values = await form.validateFields();
+      // Zorunlu alan yok - getFieldsValue ile tüm değerler okunur
+      const values = form.getFieldsValue(true);
       setSaving(true);
 
       const payload = {
-        firstName: values.firstName,
-        lastName: values.lastName,
-        tcKimlik: values.tcKimlik,
+        firstName: values.firstName || 'Yeni Öğrenci',
+        lastName: values.lastName || '',
+        tcKimlik: values.tcKimlik || '',
         birthDate: values.birthDate ? (typeof values.birthDate.format === 'function' ? values.birthDate.format('YYYY-MM-DD') : String(values.birthDate)) : '2018-01-01',
         gender: values.gender || 'Erkek',
-        disabilityType: values.disabilityType,
+        disabilityType: values.disabilityType || (disabilities[0]?.name || 'Özel Eğitim'),
+        preferredTherapistId: values.preferredTherapistId || null,
         notes: values.notes || '',
         guardian: {
-          name: values.guardianName,
-          phone: values.guardianPhone,
+          name: values.guardianName || '',
+          phone: values.guardianPhone || '',
           email: values.guardianEmail || '',
           relationship: values.guardianRel || 'Veli'
         },
         ramReport: {
-          reportNumber: values.ramReportNo,
+          reportNumber: values.ramReportNo || '',
           issuingRam: values.issuingRam || 'İlçe RAM'
         },
-        allocatedModules: (values.selectedModules || []).map((mId: string) => ({
-          moduleId: Number(mId),
-          quotaHours: values[`quota_${mId}`] || 8
-        }))
+        allocatedModules: (values.selectedModules && values.selectedModules.length > 0)
+          ? values.selectedModules.map((mId: string) => ({
+              moduleId: Number(mId),
+              quotaHours: values[`quota_${mId}`] || 8
+            }))
+          : modules.slice(0, 1).map(m => ({ moduleId: Number(m.id), quotaHours: 8 }))
       };
 
       if (editingStudent) {
@@ -132,7 +137,7 @@ const StudentsPage: React.FC = () => {
         message.success('Öğrenci bilgileri başarıyla güncellendi! 🎉');
       } else {
         await createStudent(payload);
-        message.success('Öğrenci başarıyla kaydedildi ve ders programındaki boşluklara otomatik yerleştirildi! 🎉');
+        message.success('Öğrenci başarıyla kaydedildi ve ders programına yerleştirildi! 🎉');
       }
       setIsModalVisible(false);
       form.resetFields();
@@ -140,21 +145,7 @@ const StudentsPage: React.FC = () => {
       setCurrentStep(0);
       fetchStudents();
     } catch (err: any) {
-      if (err?.errorFields && err.errorFields.length > 0) {
-        const errorFieldNames = err.errorFields.map((f: any) => f.name[0]);
-        if (errorFieldNames.some((f: string) => ['firstName', 'lastName', 'tcKimlik', 'birthDate', 'disabilityType'].includes(f))) {
-          setCurrentStep(0);
-        } else if (errorFieldNames.some((f: string) => ['guardianName', 'guardianPhone', 'guardianRel', 'guardianEmail'].includes(f))) {
-          setCurrentStep(1);
-        } else if (errorFieldNames.some((f: string) => ['ramReportNo', 'issuingRam'].includes(f))) {
-          setCurrentStep(2);
-        } else {
-          setCurrentStep(3);
-        }
-        message.warning(err.errorFields[0]?.errors[0] || 'Lütfen formu eksiksiz doldurun.');
-      } else {
-        message.error(err.response?.data?.detail || 'İşlem sırasında hata oluştu.');
-      }
+      message.error(err.response?.data?.detail || 'İşlem sırasında hata oluştu.');
     } finally {
       setSaving(false);
     }
@@ -172,12 +163,21 @@ const StudentsPage: React.FC = () => {
       title: 'Engel / Tanı Türü',
       dataIndex: 'disabilityType',
       key: 'disabilityType',
-      render: (d: string) => <Tag color="blue">{d}</Tag>
+      render: (d: string) => <Tag color="blue">{d || 'Belirtilmemiş'}</Tag>
+    },
+    {
+      title: 'Bireysel Öğretmen',
+      key: 'preferredTherapist',
+      render: (_: any, r: any) => r.preferredTherapistName ? (
+        <Tag color="purple" icon={<UserOutlined />}>{r.preferredTherapistName}</Tag>
+      ) : (
+        <span style={{ color: '#aaa' }}>Otomatik Dağıtım</span>
+      )
     },
     {
       title: 'Veli',
       key: 'guardian',
-      render: (_: any, r: any) => r.guardian ? `${r.guardian.name} (${r.guardian.phone})` : '-'
+      render: (_: any, r: any) => r.guardian?.name ? `${r.guardian.name} (${r.guardian.phone || '-'})` : '-'
     },
     {
       title: 'Durum',
@@ -211,12 +211,14 @@ const StudentsPage: React.FC = () => {
     }
   ];
 
+  const disabilityOptions = disabilities.map(d => ({ value: d.name, label: d.name }));
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h2 style={{ margin: 0, fontSize: '1.4rem' }}>Öğrenci Yönetimi</h2>
-          <span style={{ color: '#888' }}>Kayıt, RAM Raporu, Modül ve Veli İşlemleri</span>
+          <span style={{ color: '#888' }}>Kayıt, RAM Raporu, Bireysel Öğretmen Seçimi ve Modül İşlemleri</span>
         </div>
         <Space wrap>
           <Button icon={<ReloadOutlined />} onClick={fetchStudents}>Yenile</Button>
@@ -241,7 +243,7 @@ const StudentsPage: React.FC = () => {
           style={{ minWidth: 220, flex: 1 }}
           value={selectedDisability}
           onChange={setSelectedDisability}
-          options={DISABILITY_OPTIONS}
+          options={disabilityOptions}
         />
         <Button type="primary" onClick={fetchStudents}>Filtrele</Button>
       </div>
@@ -256,7 +258,7 @@ const StudentsPage: React.FC = () => {
       />
 
       <Modal
-        title={editingStudent ? "Öğrenci Bilgilerini Düzenle" : "Yeni Öğrenci ve RAM Raporu Kaydı"}
+        title={editingStudent ? "Öğrenci Bilgilerini Düzenle" : "Yeni Öğrenci Kaydı (Zorunlu Alan Yok)"}
         open={isModalVisible}
         onCancel={() => { setIsModalVisible(false); setEditingStudent(null); setCurrentStep(0); form.resetFields(); }}
         footer={null}
@@ -268,37 +270,30 @@ const StudentsPage: React.FC = () => {
           <Step title="Kişisel Bilgiler" />
           <Step title="Veli Bilgisi" />
           <Step title="RAM Raporu" />
-          <Step title="Modül Atama" />
+          <Step title="Öğretmen & Modül" />
         </Steps>
 
         <Form form={form} layout="vertical" preserve={true}>
+          {/* Adım 1: Kişisel Bilgiler */}
           <div style={{ display: currentStep === 0 ? 'block' : 'none' }}>
             <Row gutter={[16, 12]}>
               <Col xs={24} sm={12}>
-                <Form.Item name="firstName" label="Öğrenci Adı" rules={[{ required: true, message: 'Zorunlu alan' }]}>
-                  <Input placeholder="Örn: Ahmet" />
+                <Form.Item name="firstName" label="Öğrenci Adı">
+                  <Input placeholder="Örn: Ahmet (Opsiyonel)" />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
-                <Form.Item name="lastName" label="Öğrenci Soyadı" rules={[{ required: true, message: 'Zorunlu alan' }]}>
-                  <Input placeholder="Örn: Yılmaz" />
+                <Form.Item name="lastName" label="Öğrenci Soyadı">
+                  <Input placeholder="Örn: Yılmaz (Opsiyonel)" />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
-                <Form.Item
-                  name="tcKimlik"
-                  label="TC Kimlik No"
-                  rules={[
-                    { required: true, message: 'TC Kimlik numarası zorunludur' },
-                    { len: 11, message: 'TC Kimlik 11 haneli olmalıdır' },
-                    { pattern: /^[0-9]+$/, message: 'Yalnızca rakamlardan oluşmalıdır' }
-                  ]}
-                >
-                  <Input maxLength={11} placeholder="11 haneli TC Kimlik" />
+                <Form.Item name="tcKimlik" label="TC Kimlik No (Opsiyonel)">
+                  <Input maxLength={11} placeholder="Girilmezse otomatik üretilir" />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
-                <Form.Item name="birthDate" label="Doğum Tarihi" rules={[{ required: true, message: 'Zorunlu alan' }]}>
+                <Form.Item name="birthDate" label="Doğum Tarihi (Opsiyonel)">
                   <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" placeholder="Tarih seçiniz" />
                 </Form.Item>
               </Col>
@@ -308,22 +303,28 @@ const StudentsPage: React.FC = () => {
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
-                <Form.Item name="disabilityType" label="Engel / Tanı Türü" rules={[{ required: true, message: 'Zorunlu alan' }]}>
-                  <Select options={DISABILITY_OPTIONS} placeholder="Seçiniz" />
+                <Form.Item name="disabilityType" label="Engel / Tanı Türü">
+                  <Select
+                    options={disabilityOptions}
+                    placeholder="Tanı seçiniz (Ayarlardan düzenlenebilir)"
+                    allowClear
+                    showSearch
+                  />
                 </Form.Item>
               </Col>
             </Row>
           </div>
 
+          {/* Adım 2: Veli Bilgisi */}
           <div style={{ display: currentStep === 1 ? 'block' : 'none' }}>
             <Row gutter={[16, 12]}>
               <Col xs={24} sm={12}>
-                <Form.Item name="guardianName" label="Veli Adı Soyadı" rules={[{ required: true, message: 'Zorunlu alan' }]}>
+                <Form.Item name="guardianName" label="Veli Adı Soyadı (Opsiyonel)">
                   <Input placeholder="Örn: Mehmet Yılmaz" />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
-                <Form.Item name="guardianPhone" label="İletişim Telefonu" rules={[{ required: true, message: 'Zorunlu alan' }]}>
+                <Form.Item name="guardianPhone" label="İletişim Telefonu (Opsiyonel)">
                   <Input placeholder="Örn: 0532 123 4567" />
                 </Form.Item>
               </Col>
@@ -340,10 +341,11 @@ const StudentsPage: React.FC = () => {
             </Row>
           </div>
 
+          {/* Adım 3: RAM Raporu */}
           <div style={{ display: currentStep === 2 ? 'block' : 'none' }}>
             <Row gutter={[16, 12]}>
               <Col xs={24} sm={12}>
-                <Form.Item name="ramReportNo" label="RAM Rapor Numarası" rules={[{ required: true, message: 'Zorunlu alan' }]}>
+                <Form.Item name="ramReportNo" label="RAM Rapor Numarası (Opsiyonel)">
                   <Input placeholder="Örn: RAM-2026-9812" />
                 </Form.Item>
               </Col>
@@ -355,17 +357,40 @@ const StudentsPage: React.FC = () => {
             </Row>
           </div>
 
+          {/* Adım 4: Öğretmen Seçimi ve Modül Atama */}
           <div style={{ display: currentStep === 3 ? 'block' : 'none' }}>
-            <div>
-              <Form.Item name="selectedModules" label="Öğrencinin Alacağı Destek Eğitim Programları" rules={[{ required: true, message: 'En az bir modül seçiniz' }]}>
+            <div style={{ marginBottom: 16 }}>
+              <Form.Item
+                name="preferredTherapistId"
+                label={
+                  <span>
+                    <strong>Bireysel Öğretmen / Tercih Edilen Eğitmen</strong> (Özel İstek)
+                  </span>
+                }
+                tooltip="Öğrencinin derslerini özellikle almasını istediğiniz bir öğretmen varsa seçin. Otomatik ders programında bu öğretmene öncelik tanınacaktır."
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder="Bireysel seanslar için öğretmen seçiniz (İsteğe bağlı)"
+                  optionFilterProp="label"
+                  options={therapists.map(t => ({
+                    value: t.id,
+                    label: `${t.firstName} ${t.lastName} (${t.title || 'Öğretmen'})`
+                  }))}
+                />
+              </Form.Item>
+
+              <Form.Item name="selectedModules" label="Destek Eğitim Modülleri (Seçilmezse varsayılan atanır)">
                 <Select
                   mode="multiple"
                   placeholder="Eğitim Modüllerini Seçin"
                   options={modules.map(m => ({ value: String(m.id), label: m.name }))}
                 />
               </Form.Item>
+
               <div style={{ backgroundColor: '#f6ffed', padding: 12, border: '1px solid #b7eb8f', borderRadius: 6, marginBottom: 16 }}>
-                💡 <strong>Otomatik Dağıtım:</strong> Öğrenci kaydedildiği anda, seçilen modüllere ait seanslar ilgili branş öğretmenlerinin ve salonların takvimindeki <strong>en uygun boş saatlere otomatik yerleştirilecektir.</strong>
+                💡 <strong>Esnek Kayıt:</strong> Hiçbir alan zorunlu değildir. İsterseniz sadece öğrenci adını girip kaydedebilirsiniz. Seçtiğiniz öğretmen ve modüllere göre seanslar programdaki en uygun boşluklara yerleştirilir.
               </div>
             </div>
           </div>
@@ -377,26 +402,13 @@ const StudentsPage: React.FC = () => {
               </Button>
             )}
             {currentStep < 3 && (
-              <Button type="primary" onClick={async () => {
-                try {
-                  if (currentStep === 0) {
-                    await form.validateFields(['firstName', 'lastName', 'tcKimlik', 'birthDate', 'disabilityType']);
-                  } else if (currentStep === 1) {
-                    await form.validateFields(['guardianName', 'guardianPhone', 'guardianRel']);
-                  } else if (currentStep === 2) {
-                    await form.validateFields(['ramReportNo', 'issuingRam']);
-                  }
-                  setCurrentStep(currentStep + 1);
-                } catch (e) {
-                  // validation error
-                }
-              }}>
+              <Button type="primary" onClick={() => setCurrentStep(currentStep + 1)}>
                 İleri
               </Button>
             )}
             {currentStep === 3 && (
               <Button type="primary" loading={saving} onClick={handleFinish} style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}>
-                {editingStudent ? 'Değişiklikleri Güncelle' : 'Kaydet ve Programı Oluştur'}
+                {editingStudent ? 'Değişiklikleri Güncelle' : 'Kaydet ve Tamamla'}
               </Button>
             )}
           </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button, Select, Space, Card, Modal, Descriptions, Tag, message, Spin, Grid, Segmented, Row, Col, Form, DatePicker, TimePicker, Popconfirm, Tooltip } from 'antd';
-import { ReloadOutlined, ThunderboltOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, CalendarOutlined } from '@ant-design/icons';
+import { ReloadOutlined, ThunderboltOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, CloseCircleOutlined, PlusOutlined, CalendarOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -11,7 +11,8 @@ import { getWeeklySchedule, generateSchedule, moveSession } from '../api/schedul
 import { getTherapists } from '../api/therapists';
 import { getRooms } from '../api/rooms';
 import { getModules } from '../api/modules';
-import { updateSession, deleteSession } from '../api/sessions';
+import { getStudents } from '../api/students';
+import { createSession, updateSession, deleteSession } from '../api/sessions';
 
 const { useBreakpoint } = Grid;
 
@@ -28,14 +29,23 @@ const SchedulePage: React.FC = () => {
   const [therapists, setTherapists] = useState<any[]>([]);
   const [rooms, setRooms] = useState<any[]>([]);
   const [modules, setModules] = useState<any[]>([]);
+  const [students, setStudents] = useState<any[]>([]);
 
   const [selectedTherapist, setSelectedTherapist] = useState<string | undefined>(undefined);
   const [selectedRoom, setSelectedRoom] = useState<number | undefined>(undefined);
+  const [selectedStudent, setSelectedStudent] = useState<string | undefined>(undefined);
+
+  // Aktif takvim aralığı (Gelecek & Geçmiş tarihler için)
+  const [dateRange, setDateRange] = useState<{ start?: string; end?: string }>({});
   
   // Seans Detay & Düzenleme Modalı
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editForm] = Form.useForm();
+
+  // Yeni Seans Ekleme Modalı
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createForm] = Form.useForm();
 
   const [calendarView, setCalendarView] = useState<string>(isMobile ? 'timeGridDay' : 'timeGridWeek');
 
@@ -48,21 +58,33 @@ const SchedulePage: React.FC = () => {
 
   const fetchFilters = async () => {
     try {
-      const [tRes, rRes, mRes] = await Promise.all([getTherapists(), getRooms(), getModules()]);
+      const [tRes, rRes, mRes, sRes] = await Promise.all([
+        getTherapists().catch(() => ({ data: [] })),
+        getRooms().catch(() => []),
+        getModules().catch(() => []),
+        getStudents().catch(() => ({ data: [] }))
+      ]);
       setTherapists(tRes.data || []);
       setRooms(Array.isArray(rRes) ? rRes : (rRes as any)?.data || []);
       setModules(Array.isArray(mRes) ? mRes : (mRes as any)?.data || []);
+      setStudents(sRes.data || []);
     } catch (e) {
       console.error(e);
     }
   };
 
-  const fetchSchedule = async () => {
+  const fetchSchedule = async (customStart?: string, customEnd?: string) => {
     setLoading(true);
     try {
       const params: any = {};
+      const start = customStart || dateRange.start;
+      const end = customEnd || dateRange.end;
+      if (start) params.start = start;
+      if (end) params.end = end;
       if (selectedTherapist) params.therapist_id = selectedTherapist;
       if (selectedRoom) params.room_id = selectedRoom;
+      if (selectedStudent) params.student_id = selectedStudent;
+      
       const res = await getWeeklySchedule(params);
       setEvents(res || []);
     } catch (err) {
@@ -78,7 +100,15 @@ const SchedulePage: React.FC = () => {
 
   useEffect(() => {
     fetchSchedule();
-  }, [selectedTherapist, selectedRoom]);
+  }, [selectedTherapist, selectedRoom, selectedStudent]);
+
+  // Takvim tarih veya görünüm değiştirdiğinde (ileri tarihleri yükler)
+  const handleDatesSet = (dateInfo: any) => {
+    const newStart = dateInfo.startStr.split('T')[0];
+    const newEnd = dateInfo.endStr.split('T')[0];
+    setDateRange({ start: newStart, end: newEnd });
+    fetchSchedule(newStart, newEnd);
+  };
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -111,10 +141,76 @@ const SchedulePage: React.FC = () => {
       roomId: props?.roomId,
       moduleName: props?.moduleName,
       moduleId: props?.moduleId,
-      status: props?.status || 'planned'
+      status: props?.status || 'scheduled'
     };
     setSelectedEvent(evData);
     setIsEditing(false);
+  };
+
+  // Takvimde boş bir saat/gün kutucuğuna tıklandığında doğrudan seans ekle
+  const handleDateClick = (info: any) => {
+    const clickDate = info.dateStr.includes('T') ? info.dateStr.split('T')[0] : info.dateStr;
+    const clickTime = info.dateStr.includes('T') ? info.dateStr.split('T')[1].substring(0, 5) : '09:00';
+    
+    // 45 dk seans süresi ekle
+    const startM = dayjs(`${clickDate} ${clickTime}`);
+    const endM = startM.add(45, 'minute');
+
+    createForm.resetFields();
+    createForm.setFieldsValue({
+      date: dayjs(clickDate),
+      startTime: dayjs(clickTime, 'HH:mm'),
+      endTime: endM,
+      therapistId: selectedTherapist || (therapists[0]?.id),
+      roomId: selectedRoom || (rooms[0]?.id ? Number(rooms[0].id) : undefined),
+      moduleId: modules[0]?.id ? Number(modules[0].id) : undefined,
+      studentId: selectedStudent || (students[0]?.id),
+      status: 'scheduled'
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleOpenCreateModal = () => {
+    createForm.resetFields();
+    createForm.setFieldsValue({
+      date: dayjs(),
+      startTime: dayjs('09:00', 'HH:mm'),
+      endTime: dayjs('09:45', 'HH:mm'),
+      therapistId: selectedTherapist || (therapists[0]?.id),
+      roomId: selectedRoom || (rooms[0]?.id ? Number(rooms[0].id) : undefined),
+      moduleId: modules[0]?.id ? Number(modules[0].id) : undefined,
+      studentId: selectedStudent || (students[0]?.id),
+      status: 'scheduled'
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCreateSession = async () => {
+    try {
+      const values = createForm.getFieldsValue(true);
+      setSavingSession(true);
+
+      const payload = {
+        date: values.date ? values.date.format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD'),
+        startTime: values.startTime ? values.startTime.format('HH:mm') : '09:00',
+        endTime: values.endTime ? values.endTime.format('HH:mm') : '09:45',
+        therapistId: values.therapistId || therapists[0]?.id,
+        roomId: values.roomId ? Number(values.roomId) : (rooms[0]?.id ? Number(rooms[0].id) : 1),
+        moduleId: values.moduleId ? Number(values.moduleId) : 1,
+        studentId: values.studentId,
+        status: values.status || 'scheduled'
+      };
+
+      await createSession(payload);
+      message.success('Yeni ders / seans başarıyla programa eklendi! 🎉');
+      setIsCreateModalOpen(false);
+      createForm.resetFields();
+      fetchSchedule();
+    } catch (e: any) {
+      message.error(e.response?.data?.detail || 'Seans eklenirken hata oluştu.');
+    } finally {
+      setSavingSession(false);
+    }
   };
 
   // Sürükle - Bırak ile Seans Taşıma
@@ -139,6 +235,7 @@ const SchedulePage: React.FC = () => {
       date: selectedEvent.date ? dayjs(selectedEvent.date) : dayjs(),
       startTime: selectedEvent.startTime ? dayjs(selectedEvent.startTime, 'HH:mm') : dayjs('09:00', 'HH:mm'),
       endTime: selectedEvent.endTime ? dayjs(selectedEvent.endTime, 'HH:mm') : dayjs('09:45', 'HH:mm'),
+      studentId: selectedEvent.studentId,
       therapistId: selectedEvent.therapistId,
       roomId: selectedEvent.roomId ? Number(selectedEvent.roomId) : undefined,
       moduleId: selectedEvent.moduleId ? Number(selectedEvent.moduleId) : undefined,
@@ -149,16 +246,17 @@ const SchedulePage: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!selectedEvent) return;
     try {
-      const values = await editForm.validateFields();
+      const values = editForm.getFieldsValue(true);
       setSavingSession(true);
 
       const payload = {
-        date: values.date.format('YYYY-MM-DD'),
-        startTime: values.startTime.format('HH:mm'),
-        endTime: values.endTime.format('HH:mm'),
+        date: values.date ? values.date.format('YYYY-MM-DD') : selectedEvent.date,
+        startTime: values.startTime ? values.startTime.format('HH:mm') : selectedEvent.startTime,
+        endTime: values.endTime ? values.endTime.format('HH:mm') : selectedEvent.endTime,
+        studentId: values.studentId,
         therapistId: values.therapistId,
-        roomId: values.roomId,
-        moduleId: values.moduleId,
+        roomId: values.roomId ? Number(values.roomId) : undefined,
+        moduleId: values.moduleId ? Number(values.moduleId) : undefined,
         status: values.status
       };
 
@@ -191,7 +289,7 @@ const SchedulePage: React.FC = () => {
     if (!selectedEvent) return;
     try {
       await updateSession(selectedEvent.id, { status });
-      message.success(`Seans durumu "${status.toUpperCase()}" olarak kaydedildi.`);
+      message.success(`Seans durumu güncellendi.`);
       setSelectedEvent(null);
       fetchSchedule();
     } catch (e) {
@@ -212,13 +310,21 @@ const SchedulePage: React.FC = () => {
           <div>
             <h2 style={{ margin: 0, fontSize: isMobile ? '1.25rem' : '1.4rem' }}>Haftalık Ders ve Terapi Programı</h2>
             <span style={{ color: '#888', fontSize: isMobile ? '12px' : '14px' }}>
-              MEB Mevzuatına Uygun Otomatik & Manuel Ders Programı Yönetimi
+              İleri Tarihleri Düzenleme, Yeni Seans Ekleme ve Otomatik Dağıtım
             </span>
           </div>
           
           <Space wrap>
-            <Button icon={<ReloadOutlined />} onClick={fetchSchedule}>
+            <Button icon={<ReloadOutlined />} onClick={() => fetchSchedule()}>
               Yenile
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={handleOpenCreateModal}
+              style={{ backgroundColor: '#1890ff', borderColor: '#1890ff' }}
+            >
+              Yeni Seans / Ders Ekle
             </Button>
             <Button
               type="primary"
@@ -234,9 +340,11 @@ const SchedulePage: React.FC = () => {
 
         {/* Filtre ve Görünüm Seçici Çubuğu */}
         <Row gutter={[8, 8]} align="middle">
-          <Col xs={24} sm={12} md={7}>
+          <Col xs={24} sm={8} md={6}>
             <Select
               allowClear
+              showSearch
+              optionFilterProp="label"
               placeholder="Öğretmen Filtrele"
               style={{ width: '100%' }}
               value={selectedTherapist}
@@ -244,7 +352,19 @@ const SchedulePage: React.FC = () => {
               options={therapists.map(t => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }))}
             />
           </Col>
-          <Col xs={24} sm={12} md={7}>
+          <Col xs={24} sm={8} md={6}>
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="Öğrenci Filtrele"
+              style={{ width: '100%' }}
+              value={selectedStudent}
+              onChange={setSelectedStudent}
+              options={students.map(s => ({ value: s.id, label: `${s.firstName} ${s.lastName}` }))}
+            />
+          </Col>
+          <Col xs={24} sm={8} md={4}>
             <Select
               allowClear
               placeholder="Oda Filtrele"
@@ -254,7 +374,7 @@ const SchedulePage: React.FC = () => {
               options={rooms.map(r => ({ value: Number(r.id), label: r.name }))}
             />
           </Col>
-          <Col xs={24} md={10} style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
+          <Col xs={24} md={8} style={{ display: 'flex', justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
             <Segmented
               style={{ width: isMobile ? '100%' : 'auto', textAlign: 'center' }}
               value={calendarView}
@@ -297,6 +417,8 @@ const SchedulePage: React.FC = () => {
               businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], startTime: '09:00', endTime: '17:00' }}
               events={events}
               eventClick={handleEventClick}
+              dateClick={handleDateClick}
+              datesSet={handleDatesSet}
               editable={true}
               eventDrop={handleEventDrop}
               headerToolbar={{
@@ -318,13 +440,109 @@ const SchedulePage: React.FC = () => {
         )}
       </Card>
 
+      {/* Yeni Seans / Ders Ekleme Modalı */}
+      <Modal
+        title="Yeni Seans / Ders Ekle (İleri veya Mevcut Tarih)"
+        open={isCreateModalOpen}
+        onCancel={() => { setIsCreateModalOpen(false); createForm.resetFields(); }}
+        footer={null}
+        width="95%"
+        style={{ maxWidth: 560 }}
+        destroyOnClose={true}
+      >
+        <Form form={createForm} layout="vertical" onFinish={handleCreateSession}>
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="studentId" label="Öğrenci">
+                <Select
+                  showSearch
+                  allowClear
+                  optionFilterProp="label"
+                  placeholder="Öğrenci seçiniz"
+                  options={students.map(s => ({ value: s.id, label: `${s.firstName} ${s.lastName}` }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="therapistId" label="Öğretmen / Eğitmen">
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Öğretmen seçiniz"
+                  options={therapists.map(t => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="moduleId" label="Eğitim Branşı / Modül">
+                <Select
+                  showSearch
+                  optionFilterProp="label"
+                  placeholder="Modül seçiniz"
+                  options={modules.map(m => ({ value: Number(m.id), label: m.name }))}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="roomId" label="Oda / Salon">
+                <Select
+                  placeholder="Oda seçiniz"
+                  options={rooms.map(r => ({ value: Number(r.id), label: r.name }))}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={[12, 12]}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="date" label="Ders Tarihi">
+                <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" placeholder="İleri veya mevcut tarih" />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Form.Item name="startTime" label="Başlangıç Saati">
+                <TimePicker format="HH:mm" minuteStep={15} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={12} sm={6}>
+              <Form.Item name="endTime" label="Bitiş Saati">
+                <TimePicker format="HH:mm" minuteStep={15} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item name="status" label="Seans Durumu" initialValue="scheduled">
+            <Select
+              options={[
+                { value: 'scheduled', label: 'Planlandı' },
+                { value: 'completed', label: 'Tamamlandı' },
+                { value: 'student_absent', label: 'Öğrenci Devamsız' },
+                { value: 'cancelled', label: 'İptal Edildi' }
+              ]}
+            />
+          </Form.Item>
+
+          <div style={{ textAlign: 'right', marginTop: 16 }}>
+            <Space>
+              <Button onClick={() => setIsCreateModalOpen(false)}>Vazgeç</Button>
+              <Button type="primary" htmlType="submit" loading={savingSession} style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}>
+                Programa Ekle
+              </Button>
+            </Space>
+          </div>
+        </Form>
+      </Modal>
+
       {/* Seans Detayı ve Düzenleme Modalı */}
       <Modal
-        title={isEditing ? "Seansı Düzenle" : "Seans Detayı ve Yönetimi"}
+        title={isEditing ? "Seansı Düzenle (Öğrenci, Tarih, Saat, Öğretmen Değiştir)" : "Seans Detayı ve Yönetimi"}
         open={!!selectedEvent}
         onCancel={() => { setSelectedEvent(null); setIsEditing(false); }}
         width="95%"
-        style={{ maxWidth: 540 }}
+        style={{ maxWidth: 580 }}
         footer={null}
         destroyOnClose={true}
       >
@@ -358,7 +576,7 @@ const SchedulePage: React.FC = () => {
             </Descriptions>
 
             <div style={{ backgroundColor: '#f0f5ff', padding: 10, borderRadius: 6, marginBottom: 16, fontSize: '13px' }}>
-              💡 <strong>İpucu:</strong> Seansları takvim üzerinde sürükleyip bırakarak başka gün ve saatlere anında taşıyabilirsiniz.
+              💡 <strong>İpucu:</strong> Seansın tarihini ileriye ertelemek, öğrencisini veya öğretmenini değiştirmek için <strong>Düzenle</strong> butonuna tıklayın. Ayrıca takvimde sürükleyip bırakarak da başka güne taşıyabilirsiniz.
             </div>
 
             <Row gutter={[8, 8]} justify="end">
@@ -374,12 +592,12 @@ const SchedulePage: React.FC = () => {
               </Col>
               <Col>
                 <Button type="primary" icon={<EditOutlined />} onClick={handleStartEdit}>
-                  Düzenle
+                  Düzenle / Ertele
                 </Button>
               </Col>
               <Col>
                 <Popconfirm
-                  title="Bu seansı ders programından silmek istediğinize emin misiniz?"
+                  title="Bu seansı ders programından tamamen silmek istediğinize emin misiniz?"
                   onConfirm={handleDeleteSession}
                   okText="Evet, Sil"
                   cancelText="Vazgeç"
@@ -397,17 +615,41 @@ const SchedulePage: React.FC = () => {
           <Form form={editForm} layout="vertical" onFinish={handleSaveEdit}>
             <Row gutter={[12, 12]}>
               <Col xs={24} sm={12}>
-                <Form.Item name="date" label="Tarih" rules={[{ required: true, message: 'Tarih seçiniz' }]}>
+                <Form.Item name="studentId" label="Öğrenci">
+                  <Select
+                    showSearch
+                    allowClear
+                    optionFilterProp="label"
+                    placeholder="Öğrenci seçiniz"
+                    options={students.map(s => ({ value: s.id, label: `${s.firstName} ${s.lastName}` }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item name="therapistId" label="Öğretmen / Terapist">
+                  <Select
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Öğretmen seçiniz"
+                    options={therapists.map(t => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }))}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={[12, 12]}>
+              <Col xs={24} sm={12}>
+                <Form.Item name="date" label="Ders Tarihi (İleri Tarihe Erteleme)">
                   <DatePicker style={{ width: '100%' }} format="DD.MM.YYYY" />
                 </Form.Item>
               </Col>
               <Col xs={12} sm={6}>
-                <Form.Item name="startTime" label="Başlangıç" rules={[{ required: true, message: 'Saat seçiniz' }]}>
+                <Form.Item name="startTime" label="Başlangıç">
                   <TimePicker format="HH:mm" minuteStep={15} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col xs={12} sm={6}>
-                <Form.Item name="endTime" label="Bitiş" rules={[{ required: true, message: 'Saat seçiniz' }]}>
+                <Form.Item name="endTime" label="Bitiş">
                   <TimePicker format="HH:mm" minuteStep={15} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
@@ -415,15 +657,17 @@ const SchedulePage: React.FC = () => {
 
             <Row gutter={[12, 12]}>
               <Col xs={24} sm={12}>
-                <Form.Item name="therapistId" label="Öğretmen / Terapist" rules={[{ required: true, message: 'Öğretmen seçiniz' }]}>
+                <Form.Item name="moduleId" label="Eğitim Modülü">
                   <Select
-                    placeholder="Öğretmen seçiniz"
-                    options={therapists.map(t => ({ value: t.id, label: `${t.firstName} ${t.lastName}` }))}
+                    showSearch
+                    optionFilterProp="label"
+                    placeholder="Modül seçiniz"
+                    options={modules.map(m => ({ value: Number(m.id), label: m.name }))}
                   />
                 </Form.Item>
               </Col>
               <Col xs={24} sm={12}>
-                <Form.Item name="roomId" label="Oda / Salon" rules={[{ required: true, message: 'Oda seçiniz' }]}>
+                <Form.Item name="roomId" label="Oda / Salon">
                   <Select
                     placeholder="Oda seçiniz"
                     options={rooms.map(r => ({ value: Number(r.id), label: r.name }))}
@@ -432,28 +676,16 @@ const SchedulePage: React.FC = () => {
               </Col>
             </Row>
 
-            <Row gutter={[12, 12]}>
-              <Col xs={24} sm={12}>
-                <Form.Item name="moduleId" label="Eğitim Modülü" rules={[{ required: true, message: 'Modül seçiniz' }]}>
-                  <Select
-                    placeholder="Modül seçiniz"
-                    options={modules.map(m => ({ value: Number(m.id), label: m.name }))}
-                  />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item name="status" label="Seans Durumu">
-                  <Select
-                    options={[
-                      { value: 'scheduled', label: 'Planlandı' },
-                      { value: 'completed', label: 'Tamamlandı' },
-                      { value: 'student_absent', label: 'Öğrenci Devamsız' },
-                      { value: 'cancelled', label: 'İptal Edildi' }
-                    ]}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
+            <Form.Item name="status" label="Seans Durumu">
+              <Select
+                options={[
+                  { value: 'scheduled', label: 'Planlandı' },
+                  { value: 'completed', label: 'Tamamlandı' },
+                  { value: 'student_absent', label: 'Öğrenci Devamsız' },
+                  { value: 'cancelled', label: 'İptal Edildi' }
+                ]}
+              />
+            </Form.Item>
 
             <div style={{ textAlign: 'right', marginTop: 16 }}>
               <Space>

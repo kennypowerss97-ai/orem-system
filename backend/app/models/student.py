@@ -6,12 +6,13 @@ from app.database import Base
 class Student(Base):
     __tablename__ = "students"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    tc_kimlik = Column(String(11), unique=True, index=True, nullable=False)
-    first_name = Column(String, nullable=False)
-    last_name = Column(String, nullable=False)
-    birth_date = Column(Date, nullable=False)
-    gender = Column(String)
-    disability_type = Column(String)
+    tc_kimlik = Column(String(11), unique=True, index=True, nullable=True)
+    first_name = Column(String, nullable=True, default="Yeni Öğrenci")
+    last_name = Column(String, nullable=True, default="")
+    birth_date = Column(Date, nullable=True)
+    gender = Column(String, default="Erkek")
+    disability_type = Column(String, default="Özel Eğitim")
+    preferred_therapist_id = Column(String, ForeignKey("therapists.id"), nullable=True)
     notes = Column(String)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -19,6 +20,8 @@ class Student(Base):
 
     guardians = sa_relationship("Guardian", back_populates="student")
     ram_reports = sa_relationship("RamReport", back_populates="student")
+    preferred_therapist = sa_relationship("Therapist", foreign_keys=[preferred_therapist_id])
+
 
 class Guardian(Base):
     __tablename__ = "guardians"

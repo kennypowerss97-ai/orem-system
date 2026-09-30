@@ -35,3 +35,8 @@ export const deleteSession = async (id: string): Promise<any> => {
   const res = await apiClient.delete(`/sessions/${id}`);
   return res.data;
 };
+
+export const createSession = async (data: any): Promise<any> => {
+  const res = await apiClient.post('/sessions', data);
+  return res.data;
+};

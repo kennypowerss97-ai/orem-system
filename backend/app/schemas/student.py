@@ -54,12 +54,13 @@ class RamReportResponse(RamReportBase):
         from_attributes = True
 
 class StudentBase(BaseModel):
-    tc_kimlik: str
-    first_name: str
-    last_name: str
-    birth_date: date
+    tc_kimlik: Optional[str] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    birth_date: Optional[date] = None
     gender: Optional[str] = None
     disability_type: Optional[str] = None
+    preferred_therapist_id: Optional[str] = None
     notes: Optional[str] = None
     is_active: bool = True
 
@@ -69,6 +70,12 @@ class StudentCreate(StudentBase):
 class StudentUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    tc_kimlik: Optional[str] = None
+    birth_date: Optional[date] = None
+    gender: Optional[str] = None
+    disability_type: Optional[str] = None
+    preferred_therapist_id: Optional[str] = None
+    notes: Optional[str] = None
     is_active: Optional[bool] = None
 
 class StudentResponse(StudentBase):
@@ -76,6 +83,7 @@ class StudentResponse(StudentBase):
     created_at: datetime
     guardians: List[GuardianResponse] = []
     ram_reports: List[RamReportResponse] = []
+    preferred_therapist_name: Optional[str] = None
     
     class Config:
         from_attributes = True

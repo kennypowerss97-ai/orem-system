@@ -29,3 +29,13 @@ export const createModule = async (data: any): Promise<TherapyModule> => {
   return res.data;
 };
 
+export const updateModule = async (id: string | number, data: any): Promise<any> => {
+  const res = await apiClient.put(`/modules/${id}`, data);
+  return res.data;
+};
+
+export const deleteModule = async (id: string | number): Promise<any> => {
+  const res = await apiClient.delete(`/modules/${id}`);
+  return res.data;
+};
+

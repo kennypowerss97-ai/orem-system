@@ -303,6 +303,14 @@ class SchedulerEngine:
         if not candidate_therapists:
             candidate_therapists = therapists # Fallback if no exact specialization mapped
 
+        # If student has a preferred therapist, prioritize them first!
+        if hasattr(student, 'preferred_therapist_id') and student.preferred_therapist_id:
+            pref_t = next((t for t in therapists if t.id == student.preferred_therapist_id), None)
+            if pref_t:
+                # Place preferred therapist at the very front
+                candidate_therapists = [pref_t] + [t for t in candidate_therapists if t.id != pref_t.id]
+
+
         # Find candidate rooms supporting this module
         candidate_rooms = [
             r for r in rooms

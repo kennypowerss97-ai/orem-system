@@ -269,12 +269,12 @@ const TherapistsPage: React.FC = () => {
         <Form layout="vertical" form={form} onFinish={handleAddOrUpdate}>
           <Row gutter={[16, 12]}>
             <Col xs={24} sm={12}>
-              <Form.Item name="firstName" label="Ad" rules={[{ required: true, message: 'Lütfen ad giriniz' }]}>
+              <Form.Item name="firstName" label="Ad">
                 <Input placeholder="Örn: Ayşe" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="lastName" label="Soyad" rules={[{ required: true, message: 'Lütfen soyad giriniz' }]}>
+              <Form.Item name="lastName" label="Soyad">
                 <Input placeholder="Örn: Demir" />
               </Form.Item>
             </Col>
@@ -282,20 +282,12 @@ const TherapistsPage: React.FC = () => {
           
           <Row gutter={[16, 12]}>
             <Col xs={24} sm={12}>
-              <Form.Item
-                name="tcKimlik"
-                label="TC Kimlik"
-                rules={[
-                  { required: true, message: 'Lütfen TC kimlik giriniz' },
-                  { len: 11, message: 'TC Kimlik 11 haneli olmalıdır' },
-                  { pattern: /^[0-9]+$/, message: 'Yalnızca rakamlardan oluşmalıdır' }
-                ]}
-              >
-                <Input maxLength={11} placeholder="11 haneli TC Kimlik" />
+              <Form.Item name="tcKimlik" label="TC Kimlik (Opsiyonel)">
+                <Input maxLength={11} placeholder="Girilmezse otomatik atanır" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="title" label="Unvan" rules={[{ required: true, message: 'Lütfen unvan giriniz' }]}>
+              <Form.Item name="title" label="Unvan" initialValue="Eğitmen / Terapist">
                 <Input placeholder="Örn: Fizyoterapist" />
               </Form.Item>
             </Col>
@@ -303,12 +295,12 @@ const TherapistsPage: React.FC = () => {
           
           <Row gutter={[16, 12]}>
             <Col xs={24} sm={12}>
-              <Form.Item name="phone" label="Telefon">
+              <Form.Item name="phone" label="Telefon (Opsiyonel)">
                 <Input placeholder="05XX XXX XX XX" />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="email" label="Email" rules={[{ type: 'email', message: 'Geçerli bir e-posta giriniz' }]}>
+              <Form.Item name="email" label="Email (Opsiyonel)">
                 <Input placeholder="ornek@eposta.com" />
               </Form.Item>
             </Col>
@@ -316,7 +308,7 @@ const TherapistsPage: React.FC = () => {
 
           <Row gutter={[16, 12]}>
             <Col xs={24} sm={12}>
-              <Form.Item name="weeklyHours" label="Haftalık Saat" rules={[{ required: true, message: 'Haftalık saat zorunludur' }]} initialValue={40}>
+              <Form.Item name="weeklyHours" label="Haftalık Saat" initialValue={40}>
                 <InputNumber min={1} max={60} style={{ width: '100%' }} />
               </Form.Item>
             </Col>

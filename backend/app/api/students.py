@@ -30,7 +30,8 @@ async def list_students(
 ):
     query = select(Student).options(
         selectinload(Student.guardians),
-        selectinload(Student.ram_reports).selectinload(RamReport.allocated_modules)
+        selectinload(Student.ram_reports).selectinload(RamReport.allocated_modules),
+        selectinload(Student.preferred_therapist)
     )
     if search:
         query = query.filter(
@@ -58,6 +59,8 @@ async def list_students(
                     "quotaHours": m.monthly_individual_hours
                 })
 
+        pref_name = f"{s.preferred_therapist.first_name} {s.preferred_therapist.last_name}" if s.preferred_therapist else None
+
         data.append({
             "id": s.id,
             "firstName": s.first_name,
@@ -66,6 +69,8 @@ async def list_students(
             "birthDate": str(s.birth_date),
             "gender": s.gender,
             "disabilityType": s.disability_type or "Belirtilmemiş",
+            "preferredTherapistId": s.preferred_therapist_id,
+            "preferredTherapistName": pref_name,
             "status": "active" if s.is_active else "inactive",
             "guardian": {
                 "name": primary_g.name if primary_g else "",
@@ -87,20 +92,27 @@ async def list_students(
 @router.post("")
 @router.post("/")
 async def create_student(data: dict, db: AsyncSession = Depends(get_db)):
-    first_name = data.get("firstName") or data.get("first_name", "")
-    last_name = data.get("lastName") or data.get("last_name", "")
-    tc_kimlik = data.get("tcKimlik") or data.get("tc_kimlik", "")
+    import random
+    first_name = (data.get("firstName") or data.get("first_name") or "").strip() or "Yeni Öğrenci"
+    last_name = (data.get("lastName") or data.get("last_name") or "").strip() or "-"
+    tc_kimlik = (data.get("tcKimlik") or data.get("tc_kimlik") or "").strip()
+    
+    # Hiçbir alan zorunlu olmasın: TC girilmemişse otomatik 11 haneli benzersiz geçici ID üret
+    if not tc_kimlik:
+        tc_kimlik = f"99{random.randint(100000000, 999999999)}"
+        # Duplicate kontrolü yapıp varsa tekrar üret
+        while (await db.execute(select(Student).filter(Student.tc_kimlik == tc_kimlik))).scalar_one_or_none():
+            tc_kimlik = f"99{random.randint(100000000, 999999999)}"
+    else:
+        existing = await db.execute(select(Student).filter(Student.tc_kimlik == tc_kimlik))
+        if existing.scalar_one_or_none():
+            # Eğer aynı TC varsa sonuna rastgele ekle veya güncelle
+            tc_kimlik = f"{tc_kimlik[:9]}{random.randint(10, 99)}"
+
     b_date_raw = data.get("birthDate") or data.get("birth_date")
-    birth_date = date.fromisoformat(b_date_raw) if b_date_raw else date(2018, 1, 1)
+    birth_date = date.fromisoformat(str(b_date_raw).split("T")[0]) if b_date_raw else date(2018, 1, 1)
 
-    # Boş TC kontrolü
-    if not tc_kimlik or not tc_kimlik.strip():
-        raise HTTPException(status_code=400, detail="TC Kimlik numarası boş olamaz.")
-
-    # Duplicate TC kontrolü
-    existing = await db.execute(select(Student).filter(Student.tc_kimlik == tc_kimlik))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail=f"Bu TC Kimlik ({tc_kimlik}) ile kayıtlı bir öğrenci zaten var.")
+    pref_therapist_id = data.get("preferredTherapistId") or data.get("preferred_therapist_id")
 
     try:
         student = Student(
@@ -110,6 +122,7 @@ async def create_student(data: dict, db: AsyncSession = Depends(get_db)):
             birth_date=birth_date,
             gender=data.get("gender", "Erkek"),
             disability_type=data.get("disabilityType") or data.get("disability_type", "Özel Eğitim"),
+            preferred_therapist_id=pref_therapist_id,
             notes=data.get("notes", ""),
             is_active=True
         )
@@ -118,16 +131,17 @@ async def create_student(data: dict, db: AsyncSession = Depends(get_db)):
 
         # Guardian if provided
         g_data = data.get("guardian", {})
-        if g_data and g_data.get("name"):
+        if g_data and (g_data.get("name") or g_data.get("phone")):
             guardian = Guardian(
                 student_id=student.id,
-                name=g_data.get("name"),
+                name=g_data.get("name") or "Veli",
                 phone=g_data.get("phone", ""),
                 email=g_data.get("email", ""),
                 relationship=g_data.get("relationship", "Veli"),
                 is_primary=True
             )
             db.add(guardian)
+
 
         # RAM Report if provided
         r_data = data.get("ramReport", {})
@@ -179,7 +193,8 @@ async def get_student(id: str, db: AsyncSession = Depends(get_db)):
         .filter(Student.id == id)
         .options(
             selectinload(Student.guardians),
-            selectinload(Student.ram_reports).selectinload(RamReport.allocated_modules)
+            selectinload(Student.ram_reports).selectinload(RamReport.allocated_modules),
+            selectinload(Student.preferred_therapist)
         )
     )
     s = result.scalar_one_or_none()
@@ -197,6 +212,8 @@ async def get_student(id: str, db: AsyncSession = Depends(get_db)):
                 "quotaHours": m.monthly_individual_hours
             })
 
+    pref_name = f"{s.preferred_therapist.first_name} {s.preferred_therapist.last_name}" if s.preferred_therapist else None
+
     return {
         "id": s.id,
         "firstName": s.first_name,
@@ -205,6 +222,8 @@ async def get_student(id: str, db: AsyncSession = Depends(get_db)):
         "birthDate": str(s.birth_date),
         "gender": s.gender,
         "disabilityType": s.disability_type,
+        "preferredTherapistId": s.preferred_therapist_id,
+        "preferredTherapistName": pref_name,
         "notes": s.notes,
         "status": "active" if s.is_active else "inactive",
         "guardian": {
@@ -250,6 +269,8 @@ async def update_student(id: str, data: dict, db: AsyncSession = Depends(get_db)
         student.gender = data["gender"]
     if "disabilityType" in data or "disability_type" in data:
         student.disability_type = data.get("disabilityType") or data.get("disability_type")
+    if "preferredTherapistId" in data or "preferred_therapist_id" in data:
+        student.preferred_therapist_id = data.get("preferredTherapistId") or data.get("preferred_therapist_id")
     if "notes" in data:
         student.notes = data["notes"]
     if "is_active" in data:

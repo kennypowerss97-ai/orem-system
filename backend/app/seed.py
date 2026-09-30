@@ -70,6 +70,14 @@ async def seed_all_data(db: AsyncSession):
             for mod_id in r["modules"]:
                 rm = RoomModule(room_id=room.id, module_id=mod_id)
                 db.add(rm)
+    # 4. Disability Types (Engel Tanıları)
+    from app.models.disability import DisabilityType
+    from app.api.disabilities import DEFAULT_DISABILITIES
+    for d_name in DEFAULT_DISABILITIES:
+        d_check = await db.execute(select(DisabilityType).filter(DisabilityType.name == d_name))
+        if not d_check.scalars().first():
+            db.add(DisabilityType(name=d_name, description="MEB Standart Tanı", is_active=True))
+
     await db.commit()
-    logger.info("Seed data initialized: Admin user, MEB modules and Rooms ready.")
+    logger.info("Seed data initialized: Admin user, MEB modules, Rooms and Disabilities ready.")
 

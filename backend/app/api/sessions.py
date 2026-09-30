@@ -83,6 +83,46 @@ async def get_today_sessions(db: AsyncSession = Depends(get_db)):
     res = await get_sessions(start_date=str(date.today()), end_date=str(date.today()), db=db)
     return res.get("data", [])
 
+@router.post("")
+@router.post("/")
+async def create_session(data: dict, db: AsyncSession = Depends(get_db)):
+    st_raw = data.get("startTime", "09:00")
+    et_raw = data.get("endTime", "09:45")
+    st_parts = [int(x) for x in st_raw.split(":")]
+    et_parts = [int(x) for x in et_raw.split(":")]
+    
+    date_raw = data.get("date")
+    sess_date = date.fromisoformat(str(date_raw).split("T")[0]) if date_raw else date.today()
+
+    session = TherapySession(
+        module_id=int(data.get("moduleId", 1)),
+        therapist_id=str(data.get("therapistId")),
+        room_id=int(data.get("roomId", 1)),
+        session_date=sess_date,
+        start_time=time(st_parts[0], st_parts[1]),
+        end_time=time(et_parts[0], et_parts[1]),
+        status=SessionStatusEnum.SCHEDULED
+    )
+    db.add(session)
+    await db.flush()
+
+    # Participant student
+    student_id = data.get("studentId")
+    if student_id:
+        participant = SessionParticipant(
+            session_id=session.id,
+            student_id=str(student_id),
+            attended=False
+        )
+        db.add(participant)
+    elif data.get("participant_student_ids"):
+        for sid in data["participant_student_ids"]:
+            db.add(SessionParticipant(session_id=session.id, student_id=str(sid), attended=False))
+
+    await db.commit()
+    return {"message": "Ders/Seans başarıyla oluşturuldu.", "id": session.id}
+
+
 @router.get("/{id}")
 async def get_session(id: str, db: AsyncSession = Depends(get_db)):
     query = await db.execute(
@@ -158,7 +198,7 @@ async def update_session(id: str, data: dict, db: AsyncSession = Depends(get_db)
         raise HTTPException(status_code=404, detail="Seans bulunamadı")
 
     if "date" in data and data["date"]:
-        sess.session_date = date.fromisoformat(data["date"])
+        sess.session_date = date.fromisoformat(str(data["date"]).split("T")[0])
     if "startTime" in data and data["startTime"]:
         st_parts = [int(x) for x in data["startTime"].split(":")]
         sess.start_time = time(st_parts[0], st_parts[1])

@@ -45,17 +45,31 @@ async def add_student_schedule(student_id: str, data: dict = {}, db: AsyncSessio
 @router.get("/weekly")
 async def get_weekly_schedule(
     week_start: Optional[str] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    start: Optional[str] = None,
+    end: Optional[str] = None,
     therapist_id: Optional[str] = None,
     room_id: Optional[int] = None,
     student_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db)
 ):
-    if week_start:
-        start_d = date.fromisoformat(week_start)
+    # Parse start date
+    raw_start = start_date or start or week_start
+    if raw_start:
+        start_d = date.fromisoformat(str(raw_start).split("T")[0])
     else:
-        today = date.today()
-        start_d = today - timedelta(days=today.weekday())
-    end_d = start_d + timedelta(days=6)
+        # Default to 30 days past and 90 days future so future & current sessions always load
+        start_d = date.today() - timedelta(days=30)
+
+    # Parse end date
+    raw_end = end_date or end
+    if raw_end:
+        end_d = date.fromisoformat(str(raw_end).split("T")[0])
+    elif raw_start and week_start:
+        end_d = start_d + timedelta(days=6)
+    else:
+        end_d = date.today() + timedelta(days=90)
 
     query = select(TherapySession).filter(
         TherapySession.session_date >= start_d,
