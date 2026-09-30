@@ -1,0 +1,121 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  background-color: #f0f2f5;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+.ant-card {
+  transition: all 0.3s;
+}
+
+.ant-card-hoverable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Mobil Uyumluluk Stilleri */
+@media (max-width: 768px) {
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+
+  .ant-modal {
+    max-width: 95vw !important;
+    margin: 10px auto !important;
+    top: 20px !important;
+  }
+
+  .ant-modal-content {
+    padding: 16px !important;
+  }
+
+  .ant-form-item {
+    margin-bottom: 14px;
+  }
+
+  /* Buton grupları ve form altı butonlar */
+  .ant-modal-footer,
+  .ant-form-item:last-child .ant-space {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  /* Table padding */
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 8px 8px !important;
+    font-size: 13px;
+  }
+
+  /* Steps mobil düzeni */
+  .ant-steps-horizontal.ant-steps-label-horizontal {
+    flex-wrap: wrap;
+  }
+
+  /* FullCalendar Mobil İyileştirmeleri */
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .fc .fc-toolbar-title {
+    font-size: 1.05rem !important;
+  }
+
+  .fc .fc-button {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+  }
+
+  .fc .fc-timegrid-slot {
+    height: 32px !important;
+  }
+
+  .fc .fc-event {
+    font-size: 11px !important;
+    line-height: 1.25 !important;
+    padding: 2px 4px !important;
+    border-radius: 4px !important;
+    cursor: pointer;
+  }
+
+  .fc .fc-col-header-cell-cushion {
+    font-size: 12px !important;
+    padding: 4px 2px !important;
+  }
+
+  .fc .fc-timegrid-axis-cushion,
+  .fc .fc-timegrid-slot-label-cushion {
+    font-size: 11px !important;
+  }
+}
+
+.fc .fc-event {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fc .fc-event:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  z-index: 5 !important;
+}
+
