@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Tabs, Card, Table, Tag, Form, Input, Button, message, Descriptions, Space, Modal, InputNumber, Switch, Popconfirm, Tooltip, Row, Col } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, MedicineBoxOutlined, SettingOutlined, UserOutlined, InfoCircleOutlined, BookOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined, MedicineBoxOutlined, SettingOutlined, UserOutlined, InfoCircleOutlined, BookOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { getModules, createModule, updateModule, deleteModule } from '../api/modules';
 import { getDisabilities, createDisability, updateDisability, deleteDisability, DisabilityItem } from '../api/disabilities';
 import { useAuthStore } from '../store/authStore';
 
 const SettingsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [modules, setModules] = useState<any[]>([]);
   const [modulesLoading, setModulesLoading] = useState(false);
   const [disabilities, setDisabilities] = useState<DisabilityItem[]>([]);
@@ -265,23 +267,26 @@ const SettingsPage: React.FC = () => {
       key: '1',
       label: (
         <span>
-          <BookOutlined /> Branşlar & Eğitim Modülleri
+          <BookOutlined /> Destek Eğitim Programları & Modülleri
         </span>
       ),
       children: (
         <Card
-          title="Branşlar ve Terapi Modülleri Yönetimi"
+          title="MEB Destek Eğitim Programları ve Modülleri Yönetimi"
           extra={
             <Space>
+              <Button type="primary" icon={<BookOutlined />} onClick={() => navigate('/programs')}>
+                Tam Ekran Destek Programlarına Git
+              </Button>
               <Button icon={<ReloadOutlined />} onClick={fetchModules}>Yenile</Button>
-              <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreateModule}>
-                Yeni Branş Ekle
+              <Button icon={<PlusOutlined />} onClick={handleOpenCreateModule}>
+                Hızlı Modül Ekle
               </Button>
             </Space>
           }
         >
           <div style={{ marginBottom: 16, color: '#666' }}>
-            Kurumunuzda uygulanan eğitim alanlarını ve terapileri buradan yönetebilirsiniz. Eklediğiniz veya düzenlediğiniz branşlar anında öğretmen atamalarında ve ders programlarında kullanılabilir.
+            MEB Özel Eğitim standartlarına uygun 8 ana Destek Eğitim Programı (Zihinsel, Otizm, Bedensel, Dil-Konuşma vb.) ve tüm alt kazanım modülleri tanımlanmıştır. Detaylı modül yönetimi için yukarıdaki butonu kullanabilirsiniz.
           </div>
           <Table
             columns={moduleColumns}
@@ -290,6 +295,33 @@ const SettingsPage: React.FC = () => {
             loading={modulesLoading}
             pagination={false}
           />
+        </Card>
+      ),
+    },
+    {
+      key: 'branch-tab',
+      label: (
+        <span>
+          <ApartmentOutlined /> Öğretmen Branşları
+        </span>
+      ),
+      children: (
+        <Card
+          title="Öğretmen Branşları ve Uzmanlık Alanları Yönetimi"
+          extra={
+            <Button type="primary" icon={<ApartmentOutlined />} onClick={() => navigate('/branches')}>
+              Tam Ekran Branş Yönetimine Git
+            </Button>
+          }
+        >
+          <div style={{ marginBottom: 20, color: '#666', lineHeight: 1.6 }}>
+            Özel Eğitim Alanı Öğretmeni, Zihin Engelliler Öğretmeni, Çocuk Gelişimi Uzmanı, Fizyoterapist, Dil ve Konuşma Terapisti, Ergoterapist gibi tüm MEB eğitmen branşlarını buradan yönetebilir, yeni branşlar ekleyebilirsiniz.
+          </div>
+          <Space>
+            <Button type="primary" size="large" icon={<ApartmentOutlined />} onClick={() => navigate('/branches')}>
+              Öğretmen Branşlarını Yönet
+            </Button>
+          </Space>
         </Card>
       ),
     },

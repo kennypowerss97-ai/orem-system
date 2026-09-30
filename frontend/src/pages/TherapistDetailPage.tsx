@@ -52,16 +52,17 @@ export const TherapistDetailPage: React.FC = () => {
 
   const generalInfoItems = [
     { key: '1', label: 'Ad Soyad', children: `${therapist.firstName} ${therapist.lastName}` },
-    { key: '2', label: 'Unvan', children: therapist.title },
-    { key: '3', label: 'Telefon', children: therapist.phone },
-    { key: '4', label: 'E-posta', children: therapist.email },
-    { key: '5', label: 'Branşlar', children: (
+    { key: '2', label: 'Öğretmen Branşı', children: <Tag color="purple" style={{ fontSize: '13px', padding: '3px 8px' }}>{therapist.branch || therapist.title || 'Özel Eğitim Alanı Öğretmeni'}</Tag> },
+    { key: '3', label: 'Kadro / Unvan', children: therapist.title || '-' },
+    { key: '4', label: 'Telefon', children: therapist.phone || '-' },
+    { key: '5', label: 'E-posta', children: therapist.email || '-' },
+    { key: '6', label: 'Uyguladığı Terapi Modülleri', children: (
       <Space wrap size={[0, 4]}>
         {therapist.specializations?.map((spec: any, idx: number) => {
           const mod = DEFAULT_MODULES.find(m => String(m.id) === String(spec.moduleId));
           return (
             <Tag color={mod?.color || "cyan"} key={idx}>
-              {mod ? mod.name : `Branş ${spec.moduleId}`}
+              {mod ? mod.name : `Modül ${spec.moduleId}`}
             </Tag>
           );
         })}

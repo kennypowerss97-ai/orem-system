@@ -4,8 +4,8 @@ import { PlusOutlined, SearchOutlined, EyeOutlined, EditOutlined, DeleteOutlined
 import { useNavigate } from 'react-router-dom';
 import { getTherapists, createTherapist, updateTherapist, deleteTherapist } from '../api/therapists';
 import { getModules, DEFAULT_MODULES } from '../api/modules';
-
-import { Therapist } from '../types';
+import { getBranches } from '../api/branches';
+import { Therapist, TeacherBranch } from '../types';
 
 const { Option } = Select;
 
@@ -23,17 +23,28 @@ const TherapistsPage: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState<string | undefined>(undefined);
+  const [branches, setBranches] = useState<TeacherBranch[]>([]);
   
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTherapist, setEditingTherapist] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [modules, setModules] = useState<Module[]>(DEFAULT_MODULES);
 
-
   useEffect(() => {
     fetchTherapists();
     fetchModules();
-  }, []);
+    fetchBranches();
+  }, [selectedBranch]);
+
+  const fetchBranches = async () => {
+    try {
+      const bData = await getBranches();
+      setBranches(bData || []);
+    } catch (e) {
+      console.error('Branşlar yüklenemedi', e);
+    }
+  };
 
   const fetchTherapists = async () => {
     setLoading(true);
@@ -60,6 +71,9 @@ const TherapistsPage: React.FC = () => {
   const handleOpenCreate = () => {
     setEditingTherapist(null);
     form.resetFields();
+    if (branches.length > 0) {
+      form.setFieldsValue({ branch: branches[0].name });
+    }
     setIsModalVisible(true);
   };
 
@@ -75,6 +89,7 @@ const TherapistsPage: React.FC = () => {
       lastName: record.lastName,
       tcKimlik: record.tcKimlik || '',
       title: record.title || '',
+      branch: record.branch || record.title || (branches[0]?.name || 'Özel Eğitim Alanı Öğretmeni'),
       phone: record.phone || '',
       email: record.email || '',
       weeklyHours: record.weeklyHours || 40,
@@ -148,9 +163,11 @@ const TherapistsPage: React.FC = () => {
     }
   };
 
-  const filteredData = data.filter(t => 
-    `${t.firstName} ${t.lastName}`.toLowerCase().includes(searchText.toLowerCase())
-  );
+  const filteredData = data.filter(t => {
+    const matchesSearch = `${t.firstName} ${t.lastName} ${t.title || ''} ${t.branch || ''}`.toLowerCase().includes(searchText.toLowerCase());
+    const matchesBranch = selectedBranch ? (t.branch === selectedBranch || t.title === selectedBranch) : true;
+    return matchesSearch && matchesBranch;
+  });
 
   const columns = [
     {
@@ -159,12 +176,26 @@ const TherapistsPage: React.FC = () => {
       render: (text: string, record: Therapist) => <strong>{record.firstName} {record.lastName}</strong>,
     },
     {
-      title: 'Unvan',
-      dataIndex: 'title',
-      key: 'title',
+      title: 'Öğretmen Branşı',
+      key: 'branch',
+      render: (_: any, record: Therapist) => {
+        const bName = record.branch || record.title || 'Özel Eğitim Öğretmeni';
+        const bObj = branches.find(b => b.name === bName);
+        return (
+          <Tag color={bObj?.color || "purple"} style={{ fontWeight: 500, fontSize: '13px', padding: '3px 8px' }}>
+            {bName}
+          </Tag>
+        );
+      },
     },
     {
-      title: 'Branşlar',
+      title: 'Kadro / Unvan',
+      dataIndex: 'title',
+      key: 'title',
+      render: (t: string) => t || '-'
+    },
+    {
+      title: 'Uyguladığı Terapi Modülleri',
       key: 'specializations',
       render: (text: string, record: Therapist) => (
         <Space wrap size={[0, 4]}>
@@ -172,7 +203,7 @@ const TherapistsPage: React.FC = () => {
             const mod = modules.find(m => String(m.id) === String(spec.moduleId));
             return (
               <Tag color={mod?.color || "blue"} key={spec.moduleId}>
-                {mod ? mod.name : `Branş ${spec.moduleId}`}
+                {mod ? mod.name : `Modül ${spec.moduleId}`}
               </Tag>
             );
           })}
@@ -183,6 +214,7 @@ const TherapistsPage: React.FC = () => {
       title: 'Haftalık Saat',
       dataIndex: 'weeklyHours',
       key: 'weeklyHours',
+      render: (h: number) => `${h || 40} Saat`
     },
     {
       title: 'Doluluk',
@@ -233,16 +265,28 @@ const TherapistsPage: React.FC = () => {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
-        <h2 style={{ margin: 0, fontSize: '1.4rem' }}>Öğretmenler & Terapistler</h2>
+        <div>
+          <h2 style={{ margin: 0, fontSize: '1.4rem' }}>Öğretmenler & Terapistler</h2>
+          <span style={{ color: '#888' }}>Eğitmen kadrosu, MEB branş atamaları ve haftalık ders dolulukları</span>
+        </div>
         <Space wrap>
           <Input 
-            placeholder="İsimle ara..." 
+            placeholder="İsim veya branşla ara..." 
             prefix={<SearchOutlined />} 
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
             style={{ width: 220 }}
+            allowClear
           />
-          <Button icon={<ReloadOutlined />} onClick={fetchTherapists}>Yenile</Button>
+          <Select
+            allowClear
+            placeholder="Branşa Göre Filtrele"
+            style={{ minWidth: 220 }}
+            value={selectedBranch}
+            onChange={setSelectedBranch}
+            options={branches.map(b => ({ value: b.name, label: `${b.name} (${b.teacherCount || 0})` }))}
+          />
+          <Button icon={<ReloadOutlined />} onClick={() => { fetchTherapists(); fetchBranches(); }}>Yenile</Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
             Yeni Öğretmen Ekle
           </Button>
@@ -287,13 +331,23 @@ const TherapistsPage: React.FC = () => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="title" label="Unvan" initialValue="Eğitmen / Terapist">
-                <Input placeholder="Örn: Fizyoterapist" />
+              <Form.Item name="branch" label="Öğretmen Branşı" rules={[{ required: true, message: 'Lütfen branş seçiniz' }]}>
+                <Select
+                  placeholder="Branş seçiniz (Örn: Özel Eğitim, Fizyoterapist...)"
+                  showSearch
+                  optionFilterProp="label"
+                  options={branches.map(b => ({ value: b.name, label: b.name }))}
+                />
               </Form.Item>
             </Col>
           </Row>
           
           <Row gutter={[16, 12]}>
+            <Col xs={24} sm={12}>
+              <Form.Item name="title" label="Kadro / Unvan (Opsiyonel)" initialValue="Öğretmen">
+                <Input placeholder="Örn: Uzman Öğretici, Terapist, Zümre Başkanı" />
+              </Form.Item>
+            </Col>
             <Col xs={24} sm={12}>
               <Form.Item name="phone" label="Telefon (Opsiyonel)">
                 <Input placeholder="05XX XXX XX XX" />
@@ -304,17 +358,17 @@ const TherapistsPage: React.FC = () => {
                 <Input placeholder="ornek@eposta.com" />
               </Form.Item>
             </Col>
-          </Row>
-
-          <Row gutter={[16, 12]}>
             <Col xs={24} sm={12}>
               <Form.Item name="weeklyHours" label="Haftalık Saat" initialValue={40}>
                 <InputNumber min={1} max={60} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="modules" label="Branşlar">
-                <Select mode="multiple" placeholder="Branş seçiniz">
+          </Row>
+
+          <Row gutter={[16, 12]}>
+            <Col xs={24}>
+              <Form.Item name="modules" label="Verdiği Terapi & Destek Modülleri">
+                <Select mode="multiple" placeholder="Eğitim modüllerini seçiniz">
                   {modules.map(m => (
                     <Option key={m.id} value={m.id}>{m.name}</Option>
                   ))}

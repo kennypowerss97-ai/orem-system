@@ -12,7 +12,9 @@ import {
   BarChartOutlined,
   SettingOutlined,
   LogoutOutlined,
-  MenuOutlined
+  MenuOutlined,
+  ApartmentOutlined,
+  BookOutlined
 } from '@ant-design/icons';
 import { useAuthStore } from '../../store/authStore';
 
@@ -45,7 +47,9 @@ const MainLayout: React.FC = () => {
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: 'Ana Panel' },
     { key: '/students', icon: <TeamOutlined />, label: 'Öğrenciler' },
+    { key: '/programs', icon: <BookOutlined />, label: 'Destek Programları' },
     { key: '/therapists', icon: <UserOutlined />, label: 'Öğretmenler' },
+    { key: '/branches', icon: <ApartmentOutlined />, label: 'Öğretmen Branşları' },
     { key: '/schedule', icon: <CalendarOutlined />, label: 'Ders Programı' },
     { key: '/sessions', icon: <FileTextOutlined />, label: 'Seanslar' },
     { key: '/rooms', icon: <HomeOutlined />, label: 'Odalar' },

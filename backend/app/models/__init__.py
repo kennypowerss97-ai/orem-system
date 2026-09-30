@@ -6,3 +6,6 @@ from .room import Room, RoomModule
 from .session import TherapySession, SessionParticipant
 from .iep import IepPlan, IepGoal, ProgressRecord
 from .disability import DisabilityType
+from .branch import TeacherBranch
+from .education_program import EducationProgram, EducationProgramModule
+

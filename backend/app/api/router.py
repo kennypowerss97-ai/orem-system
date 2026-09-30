@@ -1,10 +1,12 @@
 from fastapi import APIRouter
-from app.api import auth, students, therapists, modules, rooms, sessions, schedule, iep, dashboard, reports, disabilities
+from app.api import auth, students, therapists, modules, rooms, sessions, schedule, iep, dashboard, reports, disabilities, branches, programs
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(students.router, prefix="/students", tags=["students"])
 api_router.include_router(therapists.router, prefix="/therapists", tags=["therapists"])
+api_router.include_router(branches.router, prefix="/branches", tags=["branches"])
+api_router.include_router(programs.router, prefix="/programs", tags=["programs"])
 api_router.include_router(modules.router, prefix="/modules", tags=["modules"])
 api_router.include_router(disabilities.router, prefix="/disabilities", tags=["disabilities"])
 api_router.include_router(rooms.router, prefix="/rooms", tags=["rooms"])
@@ -13,3 +15,4 @@ api_router.include_router(schedule.router, prefix="/schedule", tags=["schedule"]
 api_router.include_router(iep.router, prefix="/iep", tags=["iep"])
 api_router.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
+

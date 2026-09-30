@@ -12,6 +12,8 @@ import RoomsPage from './pages/RoomsPage';
 import IepPage from './pages/IepPage';
 import ReportsPage from './pages/ReportsPage';
 import SettingsPage from './pages/SettingsPage';
+import TeacherBranchesPage from './pages/TeacherBranchesPage';
+import EducationProgramsPage from './pages/EducationProgramsPage';
 import MainLayout from './components/Layout/MainLayout';
 import ProtectedRoute from './components/Layout/ProtectedRoute';
 import { useAuthStore } from './store/authStore';
@@ -37,8 +39,10 @@ const App: React.FC = () => {
         <Route index element={<DashboardPage />} />
         <Route path="students" element={<StudentsPage />} />
         <Route path="students/:id" element={<StudentDetailPage />} />
+        <Route path="programs" element={<EducationProgramsPage />} />
         <Route path="therapists" element={<TherapistsPage />} />
         <Route path="therapists/:id" element={<TherapistDetailPage />} />
+        <Route path="branches" element={<TeacherBranchesPage />} />
         <Route path="schedule" element={<SchedulePage />} />
         <Route path="sessions" element={<SessionsPage />} />
         <Route path="rooms" element={<RoomsPage />} />

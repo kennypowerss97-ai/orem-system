@@ -20,8 +20,44 @@ export interface RamReport {
 }
 
 export interface AllocatedModule {
-  moduleId: string;
+  moduleId?: string;
+  moduleName?: string;
+  programName?: string;
   quotaHours: number;
+  groupHours?: number;
+}
+
+export interface TeacherBranch {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  color?: string;
+  isActive: boolean;
+  teacherCount?: number;
+}
+
+export interface EducationProgramModule {
+  id: number;
+  name: string;
+  code?: string;
+  description?: string;
+  isGroupEligible: boolean;
+  durationMinutes: number;
+  isActive: boolean;
+}
+
+export interface EducationProgram {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  color?: string;
+  defaultIndividualHours: number;
+  defaultGroupHours: number;
+  isActive: boolean;
+  modules: EducationProgramModule[];
+  moduleCount?: number;
 }
 
 export interface Student {
@@ -32,6 +68,8 @@ export interface Student {
   birthDate: string;
   gender: string;
   disabilityType: string;
+  preferredTherapistId?: string;
+  preferredTherapistName?: string;
   status: 'active' | 'inactive' | string;
   notes?: string;
   guardian?: Guardian;
@@ -54,6 +92,7 @@ export interface Therapist {
   firstName: string;
   lastName: string;
   title?: string;
+  branch?: string;
   phone?: string;
   email?: string;
   specializations?: TherapistSpecialization[];

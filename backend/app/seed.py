@@ -78,6 +78,50 @@ async def seed_all_data(db: AsyncSession):
         if not d_check.scalars().first():
             db.add(DisabilityType(name=d_name, description="MEB Standart Tanı", is_active=True))
 
+    # 5. Teacher Branches (Öğretmen Branşları)
+    from app.models.branch import TeacherBranch
+    from app.api.branches import DEFAULT_BRANCHES
+    for b in DEFAULT_BRANCHES:
+        b_check = await db.execute(select(TeacherBranch).filter(TeacherBranch.name == b["name"]))
+        if not b_check.scalars().first():
+            db.add(TeacherBranch(
+                name=b["name"],
+                code=b["code"],
+                color=b.get("color", "#1890ff"),
+                description=b.get("description", ""),
+                is_active=True
+            ))
+
+    # 6. MEB Destek Eğitim Programları ve Modülleri
+    from app.models.education_program import EducationProgram, EducationProgramModule
+    from app.api.programs import MEB_STANDARD_PROGRAMS
+    for p in MEB_STANDARD_PROGRAMS:
+        p_check = await db.execute(select(EducationProgram).filter(EducationProgram.name == p["name"]))
+        prog_obj = p_check.scalars().first()
+        if not prog_obj:
+            prog_obj = EducationProgram(
+                name=p["name"],
+                code=p["code"],
+                color=p.get("color", "#1890ff"),
+                description=p.get("description", ""),
+                default_individual_hours=p.get("individualHours", 8),
+                default_group_hours=p.get("groupHours", 4),
+                is_active=True
+            )
+            db.add(prog_obj)
+            await db.flush()
+
+            for m in p.get("modules", []):
+                db.add(EducationProgramModule(
+                    program_id=prog_obj.id,
+                    name=m["name"],
+                    description=m.get("description", ""),
+                    is_group_eligible=m.get("isGroup", True),
+                    duration_minutes=m.get("duration", 45),
+                    is_active=True
+                ))
+
     await db.commit()
-    logger.info("Seed data initialized: Admin user, MEB modules, Rooms and Disabilities ready.")
+    logger.info("Seed data initialized: Admin user, MEB modules, Rooms, Disabilities, Branches and Education Programs ready.")
+
 

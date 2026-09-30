@@ -10,6 +10,7 @@ class Therapist(Base):
     first_name = Column(String, nullable=False)
     last_name = Column(String, nullable=False)
     title = Column(String)
+    branch = Column(String, nullable=True)
     phone = Column(String)
     email = Column(String)
     max_weekly_hours = Column(Integer, default=40)

@@ -51,7 +51,9 @@ class AllocatedModule(Base):
     __tablename__ = "allocated_modules"
     id = Column(Integer, primary_key=True, autoincrement=True)
     ram_report_id = Column(String, ForeignKey("ram_reports.id"), nullable=False)
-    module_id = Column(Integer, ForeignKey("therapy_modules.id"), nullable=False)
+    module_id = Column(Integer, ForeignKey("therapy_modules.id"), nullable=True)
+    program_name = Column(String, nullable=True)
+    module_name = Column(String, nullable=True)
     monthly_individual_hours = Column(Integer, default=8)
     monthly_group_hours = Column(Integer, default=4)
     ram_report = sa_relationship("RamReport", back_populates="allocated_modules")

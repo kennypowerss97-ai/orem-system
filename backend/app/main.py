@@ -57,6 +57,19 @@ async def startup():
             if "preferred_therapist_id" not in cols:
                 await conn.execute(text("ALTER TABLE students ADD COLUMN preferred_therapist_id VARCHAR"))
                 logger.info("Migrated students table: added preferred_therapist_id column.")
+
+            t_cols_res = await conn.execute(text("PRAGMA table_info(therapists)"))
+            t_cols = [row[1] for row in t_cols_res.fetchall()]
+            if "branch" not in t_cols:
+                await conn.execute(text("ALTER TABLE therapists ADD COLUMN branch VARCHAR"))
+                logger.info("Migrated therapists table: added branch column.")
+
+            am_cols_res = await conn.execute(text("PRAGMA table_info(allocated_modules)"))
+            am_cols = [row[1] for row in am_cols_res.fetchall()]
+            if "program_name" not in am_cols:
+                await conn.execute(text("ALTER TABLE allocated_modules ADD COLUMN program_name VARCHAR"))
+            if "module_name" not in am_cols:
+                await conn.execute(text("ALTER TABLE allocated_modules ADD COLUMN module_name VARCHAR"))
         except Exception as e:
             logger.warning(f"Schema migration notice: {e}")
     

@@ -59,9 +59,10 @@ export const StudentDetailPage: React.FC = () => {
     { key: '2', label: 'TC Kimlik', children: student.tcKimlik },
     { key: '3', label: 'Doğum Tarihi', children: dayjs(student.birthDate).format('DD MMMM YYYY') },
     { key: '4', label: 'Cinsiyet', children: student.gender === 'F' ? 'Kız' : 'Erkek' },
-    { key: '5', label: 'Engel Türü', children: student.disabilityType },
-    { key: '6', label: 'Durum', children: <Tag color={student.status === 'active' ? 'green' : 'red'}>{student.status === 'active' ? 'Aktif' : 'Pasif'}</Tag> },
-    { key: '7', label: 'Notlar', children: student.notes || '-' },
+    { key: '5', label: 'Engel / Tanı Türü', children: <Tag color="blue">{student.disabilityType || 'Belirtilmemiş'}</Tag> },
+    { key: '6', label: 'Bireysel Öğretmen', children: student.preferredTherapistName ? <Tag color="purple">{student.preferredTherapistName}</Tag> : <span style={{ color: '#aaa' }}>Otomatik Dağıtım</span> },
+    { key: '7', label: 'Durum', children: <Tag color={student.status === 'active' ? 'green' : 'red'}>{student.status === 'active' ? 'Aktif' : 'Pasif'}</Tag> },
+    { key: '8', label: 'Notlar', children: student.notes || '-' },
   ];
 
   const guardianItems = student.guardian ? [
@@ -72,15 +73,53 @@ export const StudentDetailPage: React.FC = () => {
   ] : [];
 
   const ramItems = student.ramReport ? [
-    { key: '1', label: 'Rapor No', children: student.ramReport.reportNumber },
-    { key: '2', label: 'Düzenleyen RAM', children: student.ramReport.issuingRam },
-    { key: '3', label: 'Başlangıç Tarihi', children: dayjs(student.ramReport.issueDate).format('DD MMMM YYYY') },
-    { key: '4', label: 'Bitiş Tarihi', children: dayjs(student.ramReport.expiryDate).format('DD MMMM YYYY') },
+    { key: '1', label: 'RAM Rapor Numarası', children: <strong>{student.ramReport.reportNumber}</strong> },
+    { key: '2', label: 'Düzenleyen RAM Merkezi', children: student.ramReport.issuingRam },
+    { key: '3', label: 'Rapor Başlangıç Tarihi', children: dayjs(student.ramReport.issueDate).format('DD MMMM YYYY') },
+    { key: '4', label: 'Rapor Bitiş Tarihi', children: dayjs(student.ramReport.expiryDate).format('DD MMMM YYYY') },
   ] : [];
 
-  const moduleColumns = [
-    { title: 'Modül ID', dataIndex: 'moduleId', key: 'moduleId' },
-    { title: 'Kota (Saat)', dataIndex: 'quotaHours', key: 'quotaHours' },
+  const programColumns = [
+    {
+      title: 'Destek Eğitim Programı',
+      dataIndex: 'programName',
+      key: 'programName',
+      render: (prog: string) => (
+        <Tag color="cyan" style={{ fontSize: '13px', padding: '4px 10px', fontWeight: 600 }}>
+          {prog || 'Özel Eğitim Destek Programı'}
+        </Tag>
+      )
+    },
+    {
+      title: 'Alınacak Eğitim Modülü',
+      dataIndex: 'moduleName',
+      key: 'moduleName',
+      render: (modName: string, r: any) => (
+        <Space>
+          <span style={{ fontWeight: 500 }}>{modName || `Modül ${r.moduleId}`}</span>
+          <Tag color="blue">Bireysel</Tag>
+          {(r.groupHours > 0) && <Tag color="green">Grup</Tag>}
+        </Space>
+      )
+    },
+    {
+      title: 'Aylık Ders Kotası',
+      key: 'quota',
+      render: (_: any, r: any) => (
+        <span>
+          <strong>{r.quotaHours || 8} Saat</strong> Bireysel {r.groupHours ? `+ ${r.groupHours} Saat Grup` : ''}
+        </span>
+      )
+    },
+    {
+      title: 'Atanan Eğitmen',
+      key: 'therapist',
+      render: () => student.preferredTherapistName ? (
+        <Tag color="purple">{student.preferredTherapistName}</Tag>
+      ) : (
+        <span style={{ color: '#888' }}>Merkez Otomasyonu</span>
+      )
+    }
   ];
 
   const scheduleColumns = [
@@ -134,15 +173,17 @@ export const StudentDetailPage: React.FC = () => {
               </Card>
             )}
           </Tabs.TabPane>
-          <Tabs.TabPane tab="RAM Raporu" key="2">
+          <Tabs.TabPane tab="Destek Eğitim Programları (RAM)" key="2">
             {student.ramReport ? (
               <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                <Descriptions items={ramItems} column={2} bordered title="Rapor Detayları" />
-                <Card title="Atanan Modüller" size="small">
+                <Card title="MEB RAM Rapor Bilgileri" size="small">
+                  <Descriptions items={ramItems} column={2} bordered />
+                </Card>
+                <Card title="📋 Öğrencinin Alacağı Destek Eğitim Programları & Modülleri" size="small">
                   <Table 
                     dataSource={student.allocatedModules || []} 
-                    columns={moduleColumns} 
-                    rowKey="moduleId"
+                    columns={programColumns} 
+                    rowKey={(r: any, idx?: number) => `${r.moduleId}_${idx}`}
                     pagination={false}
                   />
                 </Card>

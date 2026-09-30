@@ -55,8 +55,11 @@ async def list_students(
         if active_rep:
             for m in active_rep.allocated_modules:
                 alloc_mods.append({
-                    "moduleId": str(m.module_id),
-                    "quotaHours": m.monthly_individual_hours
+                    "moduleId": str(m.module_id) if m.module_id else "",
+                    "moduleName": m.module_name or "",
+                    "programName": m.program_name or "",
+                    "quotaHours": m.monthly_individual_hours,
+                    "groupHours": m.monthly_group_hours
                 })
 
         pref_name = f"{s.preferred_therapist.first_name} {s.preferred_therapist.last_name}" if s.preferred_therapist else None
@@ -161,14 +164,17 @@ async def create_student(data: dict, db: AsyncSession = Depends(get_db)):
         modules = data.get("allocatedModules", [])
         if not modules:
             # Default allocation 1 module with 8 hours
-            modules = [{"moduleId": 1, "quotaHours": 8}]
+            modules = [{"moduleId": 1, "quotaHours": 8, "programName": "Özel Eğitim Destek Programı", "moduleName": "Bilişsel Beceriler"}]
 
         for m in modules:
+            m_id = m.get("moduleId")
             alloc = AllocatedModule(
                 ram_report_id=ram_rep.id,
-                module_id=int(m.get("moduleId", 1)),
-                monthly_individual_hours=int(m.get("quotaHours", 8)),
-                monthly_group_hours=4
+                module_id=int(m_id) if (m_id and str(m_id).isdigit()) else 1,
+                program_name=m.get("programName") or m.get("program") or "Özel Eğitim Destek Programı",
+                module_name=m.get("moduleName") or m.get("name") or "Destek Modülü",
+                monthly_individual_hours=int(m.get("quotaHours") or m.get("individualHours") or 8),
+                monthly_group_hours=int(m.get("groupHours", 4))
             )
             db.add(alloc)
 
@@ -208,8 +214,11 @@ async def get_student(id: str, db: AsyncSession = Depends(get_db)):
     if active_rep:
         for m in active_rep.allocated_modules:
             alloc_mods.append({
-                "moduleId": str(m.module_id),
-                "quotaHours": m.monthly_individual_hours
+                "moduleId": str(m.module_id) if m.module_id else "",
+                "moduleName": m.module_name or "",
+                "programName": m.program_name or "",
+                "quotaHours": m.monthly_individual_hours,
+                "groupHours": m.monthly_group_hours
             })
 
     pref_name = f"{s.preferred_therapist.first_name} {s.preferred_therapist.last_name}" if s.preferred_therapist else None
@@ -322,11 +331,14 @@ async def update_student(id: str, data: dict, db: AsyncSession = Depends(get_db)
             for am in list(active_rep.allocated_modules):
                 await db.delete(am)
             for m in data["allocatedModules"]:
+                m_id = m.get("moduleId")
                 db.add(AllocatedModule(
                     ram_report_id=active_rep.id,
-                    module_id=int(m.get("moduleId", 1)),
-                    monthly_individual_hours=int(m.get("quotaHours", 8)),
-                    monthly_group_hours=4
+                    module_id=int(m_id) if (m_id and str(m_id).isdigit()) else 1,
+                    program_name=m.get("programName") or m.get("program") or "Özel Eğitim Destek Programı",
+                    module_name=m.get("moduleName") or m.get("name") or "Destek Modülü",
+                    monthly_individual_hours=int(m.get("quotaHours") or m.get("individualHours") or 8),
+                    monthly_group_hours=int(m.get("groupHours", 4))
                 ))
     
     await db.commit()

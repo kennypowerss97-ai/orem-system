@@ -14,14 +14,14 @@ router = APIRouter()
 
 @router.get("")
 @router.get("/")
-async def list_therapists(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(Therapist)
-        .options(
-            selectinload(Therapist.specializations),
-            selectinload(Therapist.availability)
-        )
+async def list_therapists(branch: Optional[str] = None, db: AsyncSession = Depends(get_db)):
+    query = select(Therapist).options(
+        selectinload(Therapist.specializations),
+        selectinload(Therapist.availability)
     )
+    if branch:
+        query = query.filter(Therapist.branch == branch)
+    result = await db.execute(query)
     therapists = result.scalars().all()
 
     data = []
@@ -40,7 +40,8 @@ async def list_therapists(db: AsyncSession = Depends(get_db)):
             "id": t.id,
             "firstName": t.first_name,
             "lastName": t.last_name,
-            "title": t.title,
+            "title": t.title or t.branch or "Öğretmen",
+            "branch": t.branch or t.title or "Özel Eğitim Öğretmeni",
             "phone": t.phone,
             "email": t.email,
             "weeklyHours": t.max_weekly_hours,
@@ -66,11 +67,13 @@ async def create_therapist(data: dict, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail=f"Bu TC Kimlik ({tc}) ile kayıtlı bir öğretmen zaten var.")
 
     try:
+        branch_name = data.get("branch") or data.get("title") or "Özel Eğitim Öğretmeni"
         t = Therapist(
             tc_kimlik=tc,
             first_name=data.get("firstName") or data.get("first_name", ""),
             last_name=data.get("lastName") or data.get("last_name", ""),
-            title=data.get("title", "Terapist"),
+            title=data.get("title") or branch_name,
+            branch=branch_name,
             phone=data.get("phone", ""),
             email=data.get("email", ""),
             max_weekly_hours=int(data.get("weeklyHours", 40)),
@@ -144,7 +147,8 @@ async def get_therapist(id: str, db: AsyncSession = Depends(get_db)):
         "id": t.id,
         "firstName": t.first_name,
         "lastName": t.last_name,
-        "title": t.title,
+        "title": t.title or t.branch or "Öğretmen",
+        "branch": t.branch or t.title or "Özel Eğitim Öğretmeni",
         "phone": t.phone,
         "email": t.email,
         "weeklyHours": t.max_weekly_hours,
@@ -175,6 +179,10 @@ async def update_therapist(id: str, data: dict, db: AsyncSession = Depends(get_d
         t.tc_kimlik = data["tcKimlik"]
     if "title" in data:
         t.title = data["title"]
+    if "branch" in data:
+        t.branch = data["branch"]
+        if not t.title:
+            t.title = data["branch"]
     if "phone" in data:
         t.phone = data["phone"]
     if "email" in data:
