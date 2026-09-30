@@ -5,6 +5,8 @@ import { ArrowLeftOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/tr';
 import { getTherapist, getTherapistSchedule, getTherapistWorkload } from '../api/therapists';
+import { DEFAULT_MODULES } from '../api/modules';
+
 
 dayjs.locale('tr');
 const { Title } = Typography;
@@ -54,11 +56,16 @@ export const TherapistDetailPage: React.FC = () => {
     { key: '3', label: 'Telefon', children: therapist.phone },
     { key: '4', label: 'E-posta', children: therapist.email },
     { key: '5', label: 'Branşlar', children: (
-      <>
-        {therapist.specializations?.map((spec: any, idx: number) => (
-          <Tag color="cyan" key={idx}>{spec.moduleId}</Tag>
-        ))}
-      </>
+      <Space wrap size={[0, 4]}>
+        {therapist.specializations?.map((spec: any, idx: number) => {
+          const mod = DEFAULT_MODULES.find(m => String(m.id) === String(spec.moduleId));
+          return (
+            <Tag color={mod?.color || "cyan"} key={idx}>
+              {mod ? mod.name : `Branş ${spec.moduleId}`}
+            </Tag>
+          );
+        })}
+      </Space>
     )}
   ];
 

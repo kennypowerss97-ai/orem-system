@@ -3,7 +3,7 @@ import { Table, Button, Input, Space, Tag, Progress, Modal, Form, InputNumber, S
 import { PlusOutlined, SearchOutlined, EyeOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getTherapists, createTherapist, updateTherapist, deleteTherapist } from '../api/therapists';
-import { getModules } from '../api/modules';
+import { getModules, DEFAULT_MODULES } from '../api/modules';
 
 import { Therapist } from '../types';
 
@@ -12,6 +12,7 @@ const { Option } = Select;
 interface Module {
   id: string;
   name: string;
+  color?: string;
 }
 
 const TherapistsPage: React.FC = () => {
@@ -26,7 +27,8 @@ const TherapistsPage: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingTherapist, setEditingTherapist] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [modules, setModules] = useState<Module[]>([]);
+  const [modules, setModules] = useState<Module[]>(DEFAULT_MODULES);
+
 
   useEffect(() => {
     fetchTherapists();
@@ -165,11 +167,16 @@ const TherapistsPage: React.FC = () => {
       title: 'Branşlar',
       key: 'specializations',
       render: (text: string, record: Therapist) => (
-        <>
-          {record.specializations?.map(spec => (
-            <Tag color="blue" key={spec.moduleId}>{spec.moduleId}</Tag>
-          ))}
-        </>
+        <Space wrap size={[0, 4]}>
+          {record.specializations?.map(spec => {
+            const mod = modules.find(m => String(m.id) === String(spec.moduleId));
+            return (
+              <Tag color={mod?.color || "blue"} key={spec.moduleId}>
+                {mod ? mod.name : `Branş ${spec.moduleId}`}
+              </Tag>
+            );
+          })}
+        </Space>
       ),
     },
     {

@@ -17,8 +17,10 @@ MODULE_COLORS = {
     7: "#faad14", # Görme (Sarı)
 }
 
+@router.get("")
 @router.get("/")
 async def get_modules(db: AsyncSession = Depends(get_db)):
+
     result = await db.execute(select(TherapyModule).order_by(TherapyModule.id))
     modules = result.scalars().all()
     return [
